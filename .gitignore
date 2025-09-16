@@ -1,9 +1,10 @@
 node_modules/
-dist/
-.env
-.env.local
-npm-debug.log
-.DS_Store
+./node_modules/
+./dist/
+./.env
+./.env.local
+./npm-debug.log
+./.DS_Store
 *.log
-.vercel
-.railway
+./.vercel
+./.railway
