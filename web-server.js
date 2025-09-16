@@ -9,7 +9,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'anthropic-version', 'anthropic-beta']
+}));
 app.use(express.json());
 
 const EPAGES_BASE_URL = process.env.EPAGES_BASE_URL || 'https://api.epages.com';
@@ -41,6 +45,8 @@ app.get('/api/products', async (req, res) => {
     if (!shopId) {
       return res.status(400).json({ error: 'Shop ID is required' });
     }
+
+    console.log(`Fetching products for shopId: ${shopId}, page: ${req.query.page}, resultsPerPage: ${req.query.resultsPerPage}, q: ${req.query.q}`);
     
     const data = await makeEpagesRequest(`/${shopId}/products`, {
       page: req.query.page || 1,
