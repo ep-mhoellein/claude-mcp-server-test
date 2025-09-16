@@ -1,0 +1,25 @@
+{
+  "name": "@epages/mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server for ePages Product API",
+  "main": "web-server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node web-server.js",
+    "dev": "node web-server.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5"
+  },
+  "keywords": [
+    "mcp",
+    "epages",
+    "api",
+    "products"
+  ],
+  "author": "",
+  "license": "MIT"
+}
