@@ -628,13 +628,14 @@ class EpagesMCPServer {
 
   async run(): Promise<void> {
     const port = parseInt(process.env.PORT || '3000', 10);
+    const host = process.env.HOST || '0.0.0.0';
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => crypto.randomUUID()
     });
 
     const httpServer = createServer(async (req, res) => {
-      const url = new URL(req.url || '/', `http://localhost:${port}`);
+      const url = new URL(req.url || '/', `http://${host}:${port}`);
 
       if (url.pathname === '/mcp' || url.pathname === '/mcp/') {
         await transport.handleRequest(req, res);
@@ -646,11 +647,13 @@ class EpagesMCPServer {
 
     await this.server.connect(transport);
 
-    httpServer.listen(port, () => {
-      console.log(`ePages MCP server running on http://localhost:${port}`);
+    httpServer.listen(port, host, () => {
+      const displayHost = host === '0.0.0.0' ? 'localhost' : host;
+      console.log(`ePages MCP server running on http://${displayHost}:${port}`);
+      console.log(`Listening on ${host}:${port}`);
       console.log('Server endpoints:');
-      console.log(`  - GET ${`http://localhost:${port}/mcp`} for SSE stream`);
-      console.log(`  - POST ${`http://localhost:${port}/mcp`} for JSON-RPC messages`);
+      console.log(`  - GET http://${displayHost}:${port}/mcp for SSE stream`);
+      console.log(`  - POST http://${displayHost}:${port}/mcp for JSON-RPC messages`);
     });
   }
 }

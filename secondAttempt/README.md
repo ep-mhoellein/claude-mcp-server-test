@@ -57,17 +57,27 @@ npm run dev
 
 #### Produktion
 ```bash
-# Standard Port 3000
+# Standard (Host: 0.0.0.0, Port: 3000)
 npm start
 
 # Custom Port
 PORT=8080 npm start
+
+# Custom Host
+HOST=127.0.0.1 npm start
+
+# Custom Host und Port
+HOST=192.168.1.100 PORT=8080 npm start
 ```
 
 Der Server läuft dann auf:
+- **Default Host**: `0.0.0.0` (lauscht auf allen Netzwerk-Interfaces)
+- **Default Port**: `3000`
 - **Endpoint**: `http://localhost:3000/mcp`
 - **GET-Requests**: SSE-Stream für Streaming-Antworten
 - **POST-Requests**: JSON-RPC Messages
+
+**Hinweis**: Wenn HOST auf `0.0.0.0` gesetzt ist, ist der Server von allen Netzwerk-Interfaces erreichbar. Für Produktionsumgebungen sollte dies entsprechend konfiguriert werden.
 
 ## HTTP API Dokumentation
 
@@ -317,6 +327,63 @@ curl -X POST http://localhost:3000/mcp \
     "id": 3
   }'
 ```
+
+### 5. Vollständiges Beispiel mit realem Server
+ 1. Initialisieren und Session-ID speichern
+```bash
+RESPONSE=$(curl -siX POST https://test.quaese.uber.space/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc": "2.0", "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test-client", "version": "1.0.0"}}, "id": 1}')
+
+SESSION_ID=$(echo "$RESPONSE" | grep -i "mcp-session-id" | cut -d' ' -f2 | tr -d '\r')
+```
+
+ 2. Tools auflisten
+```bash
+curl -X POST https://test.quaese.uber.space/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "mcp-session-id: $SESSION_ID" \
+  -d '{"jsonrpc": "2.0", "method": "tools/list", "params": {}, "id": 2}'
+  ```
+
+ 3. Epges konfigurieren
+```bash
+curl -X POST https://test.quaese.uber.space/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "mcp-session-id: $SESSION_ID" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "configure_epages",
+      "arguments": {
+        "baseUrl": "https://ep6unity.epages.systems",
+        "shopId": "DemoShop"
+      }
+    },
+    "id": 3
+  }'
+  ```
+
+ 4. Produkte abrufen
+```bash
+curl -X POST https://test.quaese.uber.space/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "mcp-session-id: $SESSION_ID" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "get_products",
+      "arguments": {}
+    },
+    "id": 3
+  }'
+  ```
 
 ## Technische Details
 
