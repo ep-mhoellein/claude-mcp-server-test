@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { createServer } from 'http';
+import * as crypto from 'crypto';
 import {
   CallToolRequestSchema,
   ErrorCode,
@@ -625,8 +627,31 @@ class EpagesMCPServer {
   }
 
   async run(): Promise<void> {
-    const transport = new StdioServerTransport();
+    const port = parseInt(process.env.PORT || '3000', 10);
+
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => crypto.randomUUID()
+    });
+
+    const httpServer = createServer(async (req, res) => {
+      const url = new URL(req.url || '/', `http://localhost:${port}`);
+
+      if (url.pathname === '/mcp' || url.pathname === '/mcp/') {
+        await transport.handleRequest(req, res);
+      } else {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not Found');
+      }
+    });
+
     await this.server.connect(transport);
+
+    httpServer.listen(port, () => {
+      console.log(`ePages MCP server running on http://localhost:${port}`);
+      console.log('Server endpoints:');
+      console.log(`  - GET ${`http://localhost:${port}/mcp`} for SSE stream`);
+      console.log(`  - POST ${`http://localhost:${port}/mcp`} for JSON-RPC messages`);
+    });
   }
 }
 
