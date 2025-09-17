@@ -1,5 +1,6 @@
 // enhanced-mcp-server.js
 import express from 'express';
+import morgan from 'morgan';
 import cors from 'cors';
 
 const app = express();
@@ -9,6 +10,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'anthropic-version', 'anthropic-beta']
 }));
 app.use(express.json());
+app.use(morgan('combined'));
 
 const baseUrl = process.env.EPAGES_BASE_URL || 'https://playground.quaese.uber.space';
 const PORT = process.env.PORT || 3000;
@@ -196,6 +198,11 @@ app.post('/tools/call', async (req, res) => {
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+app.use((err, req, res, next) => {
+  console.error(err.stack)
+  res.status(500).send('Something broke!')
+})
 
 app.listen(PORT, () => {
   console.log(`Enhanced MCP Server läuft auf Port ${PORT}`);
