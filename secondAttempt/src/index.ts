@@ -8,10 +8,14 @@ import { EpagesClient } from './epages-client.js';
 import { AnthropicClient } from './anthropic-client.js';
 import { EpagesConfig, AnthropicConfig, MCPToolResult } from './types.js';
 
+interface SessionData {
+  epagesClient: EpagesClient | null;
+  anthropicClient: AnthropicClient | null;
+}
+
 class EpagesMCPServer {
   private server: Server;
-  private epagesClient: EpagesClient | null = null;
-  private anthropicClient: AnthropicClient | null = null;
+  private sessions: Map<string, SessionData> = new Map();
 
   constructor() {
     this.server = new Server(
@@ -39,6 +43,22 @@ class EpagesMCPServer {
       await this.server.close();
       process.exit(0);
     });
+  }
+
+  private getSession(sessionId?: string): SessionData {
+    if (!sessionId) {
+      sessionId = 'default';
+    }
+
+    if (!this.sessions.has(sessionId)) {
+      console.log(`Creating new session: ${sessionId}`);
+      this.sessions.set(sessionId, {
+        epagesClient: null,
+        anthropicClient: null,
+      });
+    }
+
+    return this.sessions.get(sessionId)!;
   }
 
   private setupToolHandlers(): void {
@@ -312,55 +332,56 @@ class EpagesMCPServer {
       ],
     }));
 
-    this.server.setRequestHandler(CallToolRequestSchema, async request => {
+    this.server.setRequestHandler(CallToolRequestSchema, async (request, meta) => {
       const { name, arguments: args } = request.params;
+      const sessionId = meta?.sessionId;
 
       try {
         let result: MCPToolResult;
 
         switch (name) {
           case 'configure_epages':
-            result = await this.configureEpages(args as any);
+            result = await this.configureEpages(args as any, sessionId);
             break;
 
           case 'configure_anthropic':
-            result = await this.configureAnthropic(args as any);
+            result = await this.configureAnthropic(args as any, sessionId);
             break;
 
           case 'get_products':
-            result = await this.getProducts(args as any);
+            result = await this.getProducts(args as any, sessionId);
             break;
 
           case 'get_product':
-            result = await this.getProduct(args as any);
+            result = await this.getProduct(args as any, sessionId);
             break;
 
           case 'create_product':
-            result = await this.createProduct(args as any);
+            result = await this.createProduct(args as any, sessionId);
             break;
 
           case 'update_product':
-            result = await this.updateProduct(args as any);
+            result = await this.updateProduct(args as any, sessionId);
             break;
 
           case 'delete_product':
-            result = await this.deleteProduct(args as any);
+            result = await this.deleteProduct(args as any, sessionId);
             break;
 
           case 'search_products':
-            result = await this.searchProducts(args as any);
+            result = await this.searchProducts(args as any, sessionId);
             break;
 
           case 'generate_product_description':
-            result = await this.generateProductDescription(args as any);
+            result = await this.generateProductDescription(args as any, sessionId);
             break;
 
           case 'analyze_product':
-            result = await this.analyzeProduct(args as any);
+            result = await this.analyzeProduct(args as any, sessionId);
             break;
 
           case 'generate_product_tags':
-            result = await this.generateProductTags(args as any);
+            result = await this.generateProductTags(args as any, sessionId);
             break;
 
           default:
@@ -396,9 +417,10 @@ class EpagesMCPServer {
     });
   }
 
-  private async configureEpages(args: EpagesConfig): Promise<MCPToolResult> {
+  private async configureEpages(args: EpagesConfig, sessionId?: string): Promise<MCPToolResult> {
     try {
-      this.epagesClient = new EpagesClient(args);
+      const session = this.getSession(sessionId);
+      session.epagesClient = new EpagesClient(args);
       return {
         success: true,
         data: { message: 'ePages client configured successfully' },
@@ -411,9 +433,10 @@ class EpagesMCPServer {
     }
   }
 
-  private async configureAnthropic(args: AnthropicConfig): Promise<MCPToolResult> {
+  private async configureAnthropic(args: AnthropicConfig, sessionId?: string): Promise<MCPToolResult> {
     try {
-      this.anthropicClient = new AnthropicClient(args);
+      const session = this.getSession(sessionId);
+      session.anthropicClient = new AnthropicClient(args);
       return {
         success: true,
         data: { message: 'Anthropic client configured successfully' },
@@ -426,13 +449,14 @@ class EpagesMCPServer {
     }
   }
 
-  private async getProducts(args: any): Promise<MCPToolResult> {
-    if (!this.epagesClient) {
+  private async getProducts(args: any, sessionId?: string): Promise<MCPToolResult> {
+    const session = this.getSession(sessionId);
+    if (!session.epagesClient) {
       return { success: false, error: 'ePages client not configured' };
     }
 
     try {
-      const products = await this.epagesClient.getProducts(args);
+      const products = await session.epagesClient.getProducts(args);
       // console.log('Fetched products:', JSON.stringify(products, null, 2));
       return { success: true, data: products };
     } catch (error) {
@@ -443,13 +467,14 @@ class EpagesMCPServer {
     }
   }
 
-  private async getProduct(args: { productId: string }): Promise<MCPToolResult> {
-    if (!this.epagesClient) {
+  private async getProduct(args: { productId: string }, sessionId?: string): Promise<MCPToolResult> {
+    const session = this.getSession(sessionId);
+    if (!session.epagesClient) {
       return { success: false, error: 'ePages client not configured' };
     }
 
     try {
-      const product = await this.epagesClient.getProduct(args.productId);
+      const product = await session.epagesClient.getProduct(args.productId);
       return { success: true, data: product };
     } catch (error) {
       return {
@@ -459,8 +484,9 @@ class EpagesMCPServer {
     }
   }
 
-  private async createProduct(args: any): Promise<MCPToolResult> {
-    if (!this.epagesClient) {
+  private async createProduct(args: any, sessionId?: string): Promise<MCPToolResult> {
+    const session = this.getSession(sessionId);
+    if (!session.epagesClient) {
       return { success: false, error: 'ePages client not configured' };
     }
 
@@ -484,7 +510,7 @@ class EpagesMCPServer {
         };
       }
 
-      const product = await this.epagesClient.createProduct(productData);
+      const product = await session.epagesClient.createProduct(productData);
       return { success: true, data: product };
     } catch (error) {
       return {
@@ -494,8 +520,9 @@ class EpagesMCPServer {
     }
   }
 
-  private async updateProduct(args: any): Promise<MCPToolResult> {
-    if (!this.epagesClient) {
+  private async updateProduct(args: any, sessionId?: string): Promise<MCPToolResult> {
+    const session = this.getSession(sessionId);
+    if (!session.epagesClient) {
       return { success: false, error: 'ePages client not configured' };
     }
 
@@ -520,7 +547,7 @@ class EpagesMCPServer {
         };
       }
 
-      const product = await this.epagesClient.updateProduct(productId, updateData);
+      const product = await session.epagesClient.updateProduct(productId, updateData);
       return { success: true, data: product };
     } catch (error) {
       return {
@@ -530,13 +557,14 @@ class EpagesMCPServer {
     }
   }
 
-  private async deleteProduct(args: { productId: string }): Promise<MCPToolResult> {
-    if (!this.epagesClient) {
+  private async deleteProduct(args: { productId: string }, sessionId?: string): Promise<MCPToolResult> {
+    const session = this.getSession(sessionId);
+    if (!session.epagesClient) {
       return { success: false, error: 'ePages client not configured' };
     }
 
     try {
-      await this.epagesClient.deleteProduct(args.productId);
+      await session.epagesClient.deleteProduct(args.productId);
       return { success: true, data: { message: 'Product deleted successfully' } };
     } catch (error) {
       return {
@@ -546,13 +574,14 @@ class EpagesMCPServer {
     }
   }
 
-  private async searchProducts(args: any): Promise<MCPToolResult> {
-    if (!this.epagesClient) {
+  private async searchProducts(args: any, sessionId?: string): Promise<MCPToolResult> {
+    const session = this.getSession(sessionId);
+    if (!session.epagesClient) {
       return { success: false, error: 'ePages client not configured' };
     }
 
     try {
-      const products = await this.epagesClient.searchProducts(args.query, {
+      const products = await session.epagesClient.searchProducts(args.query, {
         page: args.page,
         resultsPerPage: args.resultsPerPage,
       });
@@ -565,13 +594,14 @@ class EpagesMCPServer {
     }
   }
 
-  private async generateProductDescription(args: any): Promise<MCPToolResult> {
-    if (!this.anthropicClient) {
+  private async generateProductDescription(args: any, sessionId?: string): Promise<MCPToolResult> {
+    const session = this.getSession(sessionId);
+    if (!session.anthropicClient) {
       return { success: false, error: 'Anthropic client not configured' };
     }
 
     try {
-      const description = await this.anthropicClient.generateProductDescription(args.productName, args.features);
+      const description = await session.anthropicClient.generateProductDescription(args.productName, args.features);
       return { success: true, data: { description } };
     } catch (error) {
       return {
@@ -581,8 +611,9 @@ class EpagesMCPServer {
     }
   }
 
-  private async analyzeProduct(args: { productId: string }): Promise<MCPToolResult> {
-    if (!this.epagesClient || !this.anthropicClient) {
+  private async analyzeProduct(args: { productId: string }, sessionId?: string): Promise<MCPToolResult> {
+    const session = this.getSession(sessionId);
+    if (!session.epagesClient || !session.anthropicClient) {
       return {
         success: false,
         error: 'Both ePages and Anthropic clients must be configured',
@@ -590,8 +621,8 @@ class EpagesMCPServer {
     }
 
     try {
-      const product = await this.epagesClient.getProduct(args.productId);
-      const analysis = await this.anthropicClient.analyzeProduct(product);
+      const product = await session.epagesClient.getProduct(args.productId);
+      const analysis = await session.anthropicClient.analyzeProduct(product);
       return { success: true, data: { product, analysis } };
     } catch (error) {
       return {
@@ -601,13 +632,14 @@ class EpagesMCPServer {
     }
   }
 
-  private async generateProductTags(args: any): Promise<MCPToolResult> {
-    if (!this.anthropicClient) {
+  private async generateProductTags(args: any, sessionId?: string): Promise<MCPToolResult> {
+    const session = this.getSession(sessionId);
+    if (!session.anthropicClient) {
       return { success: false, error: 'Anthropic client not configured' };
     }
 
     try {
-      const tags = await this.anthropicClient.generateProductTags(args.productName, args.description);
+      const tags = await session.anthropicClient.generateProductTags(args.productName, args.description);
       return { success: true, data: { tags } };
     } catch (error) {
       return {
