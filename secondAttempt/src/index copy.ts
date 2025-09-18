@@ -34,22 +34,15 @@ class EpagesMCPServer {
     this.setupErrorHandling();
   }
 
-  private setupToolHandlers(): void {
-    // Setup for main server instance
-    this.setupToolHandlersForServer(this.server, 'main');
-  }
-
   private setupErrorHandling(): void {
-    this.server.onerror = (error: any) => {
+    this.server.onerror = error => {
       console.error('[MCP Error]', error);
     };
 
-    if (typeof process !== 'undefined') {
-      process.on('SIGINT', async () => {
-        await this.server.close();
-        process.exit(0);
-      });
-    }
+    process.on('SIGINT', async () => {
+      await this.server.close();
+      process.exit(0);
+    });
   }
 
   private getSession(sessionId?: string): SessionData {
@@ -61,15 +54,15 @@ class EpagesMCPServer {
       console.log(`Creating new session: ${sessionId}`);
       this.sessions.set(sessionId, {
         epagesClient: null,
-        anthropicClient: null,
+        anthropicClient: null
       });
     }
 
     return this.sessions.get(sessionId)!;
   }
 
-  private setupToolHandlersForServer(server: Server, sessionId: string): void {
-    server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  private setupToolHandlers(): void {
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: [
         {
           name: 'configure_epages',
@@ -339,8 +332,9 @@ class EpagesMCPServer {
       ],
     }));
 
-    server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async (request, meta) => {
       const { name, arguments: args } = request.params;
+      const sessionId = meta?.sessionId;
 
       try {
         let result: MCPToolResult;
@@ -656,56 +650,25 @@ class EpagesMCPServer {
   }
 
   async run(): Promise<void> {
-    const port = parseInt(process.env?.PORT || '3000', 10);
-    const host = process.env?.HOST || '0.0.0.0';
+    const port = parseInt(process.env.PORT || '3000', 10);
+    const host = process.env.HOST || '0.0.0.0';
 
-    // Store transports per session
-    const transports = new Map<string, StreamableHTTPServerTransport>();
-    const servers = new Map<string, Server>();
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => crypto.randomUUID(),
+    });
 
-    const httpServer = createServer(async (req: any, res: any) => {
+    const httpServer = createServer(async (req, res) => {
       const url = new URL(req.url || '/', `http://${host}:${port}`);
 
       if (url.pathname === '/mcp' || url.pathname === '/mcp/') {
-        const sessionId = req.headers['mcp-session-id'] as string || crypto.randomUUID();
-
-        // Create new transport for each unique session
-        if (!transports.has(sessionId)) {
-          console.log(`Creating new transport for session: ${sessionId}`);
-
-          const newServer = new Server(
-            { name: 'epages-mcp-server', version: '1.0.0' },
-            { capabilities: { tools: {} } }
-          );
-
-          // Setup tool handlers for this new server instance
-          this.setupToolHandlersForServer(newServer, sessionId);
-
-          const newTransport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: () => sessionId,
-          });
-
-          await newServer.connect(newTransport);
-
-          servers.set(sessionId, newServer);
-          transports.set(sessionId, newTransport);
-
-          // Clean up old sessions after 30 minutes
-          setTimeout(() => {
-            console.log(`Cleaning up session: ${sessionId}`);
-            servers.get(sessionId)?.close();
-            servers.delete(sessionId);
-            transports.delete(sessionId);
-          }, 30 * 60 * 1000);
-        }
-
-        const transport = transports.get(sessionId)!;
         await transport.handleRequest(req, res);
       } else {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('Not Found');
       }
     });
+
+    await this.server.connect(transport);
 
     httpServer.listen(port, host, () => {
       const displayHost = host === '0.0.0.0' ? 'localhost' : host;
