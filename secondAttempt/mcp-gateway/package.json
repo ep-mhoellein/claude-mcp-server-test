@@ -1,0 +1,39 @@
+{
+  "name": "mcp-gateway",
+  "version": "1.0.0",
+  "description": "Gateway for MCP (Model Context Protocol) servers to handle multiple sessions and provide REST API access",
+  "main": "dist/mcp-gateway.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/mcp-gateway.js",
+    "start-adapter": "node dist/messages-api-adapter.js",
+    "dev": "tsc && node dist/mcp-gateway.js",
+    "dev-adapter": "tsc && node dist/messages-api-adapter.js",
+    "test": "chmod +x scripts/test-gateway.sh && ./scripts/test-gateway.sh",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "axios": "^1.6.8",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/uuid": "^9.0.8",
+    "@types/node": "^20.11.30",
+    "typescript": "^5.4.2"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "gateway",
+    "proxy",
+    "anthropic",
+    "messages-api"
+  ],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
