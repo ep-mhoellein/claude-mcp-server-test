@@ -3,12 +3,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createServer } from 'http';
 import * as crypto from 'crypto';
-import {
-  CallToolRequestSchema,
-  ErrorCode,
-  ListToolsRequestSchema,
-  McpError,
-} from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { EpagesClient } from './epages-client.js';
 import { AnthropicClient } from './anthropic-client.js';
 import { EpagesConfig, AnthropicConfig, MCPToolResult } from './types.js';
@@ -36,7 +31,7 @@ class EpagesMCPServer {
   }
 
   private setupErrorHandling(): void {
-    this.server.onerror = (error) => {
+    this.server.onerror = error => {
       console.error('[MCP Error]', error);
     };
 
@@ -317,7 +312,7 @@ class EpagesMCPServer {
       ],
     }));
 
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async request => {
       const { name, arguments: args } = request.params;
 
       try {
@@ -369,10 +364,7 @@ class EpagesMCPServer {
             break;
 
           default:
-            throw new McpError(
-              ErrorCode.MethodNotFound,
-              `Unknown tool: ${name}`
-            );
+            throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
         }
 
         return {
@@ -388,10 +380,14 @@ class EpagesMCPServer {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({
-                success: false,
-                error: error instanceof Error ? error.message : String(error),
-              }, null, 2),
+              text: JSON.stringify(
+                {
+                  success: false,
+                  error: error instanceof Error ? error.message : String(error),
+                },
+                null,
+                2
+              ),
             },
           ],
           isError: true,
@@ -437,6 +433,7 @@ class EpagesMCPServer {
 
     try {
       const products = await this.epagesClient.getProducts(args);
+      // console.log('Fetched products:', JSON.stringify(products, null, 2));
       return { success: true, data: products };
     } catch (error) {
       return {
@@ -574,10 +571,7 @@ class EpagesMCPServer {
     }
 
     try {
-      const description = await this.anthropicClient.generateProductDescription(
-        args.productName,
-        args.features
-      );
+      const description = await this.anthropicClient.generateProductDescription(args.productName, args.features);
       return { success: true, data: { description } };
     } catch (error) {
       return {
@@ -613,10 +607,7 @@ class EpagesMCPServer {
     }
 
     try {
-      const tags = await this.anthropicClient.generateProductTags(
-        args.productName,
-        args.description
-      );
+      const tags = await this.anthropicClient.generateProductTags(args.productName, args.description);
       return { success: true, data: { tags } };
     } catch (error) {
       return {
@@ -631,7 +622,7 @@ class EpagesMCPServer {
     const host = process.env.HOST || '0.0.0.0';
 
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => crypto.randomUUID()
+      sessionIdGenerator: () => crypto.randomUUID(),
     });
 
     const httpServer = createServer(async (req, res) => {
